@@ -1,0 +1,105 @@
+name: dogfood
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: ferrograph version to test (must include `pr`, v4.0.0+)
+        default: latest
+permissions:
+  contents: read
+jobs:
+  dogfood:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest]
+    runs-on: ${{ matrix.os }}
+    env:
+      GIT_AUTHOR_NAME: ci
+      GIT_AUTHOR_EMAIL: ci@example.com
+      GIT_COMMITTER_NAME: ci
+      GIT_COMMITTER_EMAIL: ci@example.com
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: GarthDB/ferrograph
+          path: src-under-test
+          fetch-depth: 0
+
+      - name: Base commit plus a newly dead function
+        id: dead
+        working-directory: src-under-test
+        run: |
+          echo "base=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          printf '\nfn ferrograph_ci_dead() {}\n' >> src/lib.rs
+          git commit -qam 'ci: dead function'
+
+      - name: Advisory run passes and fills outputs
+        id: advisory
+        uses: ./
+        with:
+          version: ${{ inputs.version || 'latest' }}
+          base: ${{ steps.dead.outputs.base }}
+          working-directory: src-under-test
+          comment: 'true' # no PR here, so this exercises the job-summary path
+      - name: Assert advisory
+        env:
+          NEW_DEAD: ${{ steps.advisory.outputs.new-dead-count }}
+          BLAST: ${{ steps.advisory.outputs.blast-count }}
+          CODE: ${{ steps.advisory.outputs.exit-code }}
+          REPORT: ${{ steps.advisory.outputs.report-path }}
+        run: |
+          [ "$NEW_DEAD" = 1 ] && [ "$CODE" = 0 ] && [ -n "$BLAST" ] && grep -q '<!-- ferrograph -->' "$REPORT"
+
+      - name: Threshold run must fail
+        id: strict
+        continue-on-error: true
+        uses: ./
+        with:
+          base: ${{ steps.dead.outputs.base }}
+          working-directory: src-under-test
+          fail-on-new-dead: 'true'
+          comment: 'false'
+      - name: Assert threshold failed
+        env:
+          OUTCOME: ${{ steps.strict.outcome }}
+          CODE: ${{ steps.strict.outputs.exit-code }}
+        run: '[ "$OUTCOME" = failure ] && [ "$CODE" = 1 ]'
+
+      - name: Replace with a clean change
+        working-directory: src-under-test
+        env:
+          BASE: ${{ steps.dead.outputs.base }}
+        run: |
+          git reset -q --hard "$BASE"
+          printf '\n// ci touch\n' >> src/lib.rs
+          git commit -qam 'ci: comment only'
+      - name: Threshold run passes when nothing is newly dead
+        id: clean
+        uses: ./
+        with:
+          base: ${{ steps.dead.outputs.base }}
+          working-directory: src-under-test
+          fail-on-new-dead: 'true'
+          comment: 'false'
+      - name: Assert clean
+        env:
+          NEW_DEAD: ${{ steps.clean.outputs.new-dead-count }}
+        run: '[ "$NEW_DEAD" = 0 ]'
+
+      - name: Missing base gives an actionable error
+        id: nobase
+        continue-on-error: true
+        uses: ./
+        with:
+          base: does-not-exist
+          working-directory: src-under-test
+          comment: 'false'
+      - name: Assert missing base failed
+        env:
+          OUTCOME: ${{ steps.nobase.outcome }}
+        run: '[ "$OUTCOME" = failure ]'

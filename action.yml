@@ -1,0 +1,130 @@
+name: ferrograph PR report
+description: Report newly dead functions and blast radius for a pull request with ferrograph. Advisory by default.
+author: GarthDB
+branding:
+  icon: git-pull-request
+  color: orange
+
+inputs:
+  version:
+    description: ferrograph release to use (`latest`, `v4.0.0` or `4.0.0`).
+    default: latest
+  base:
+    description: Base ref to diff against. Defaults to `origin/<PR base ref>`.
+    default: ''
+  fail-on-new-dead:
+    description: Fail the job if any function is newly dead.
+    default: 'false'
+  max-new-dead:
+    description: Fail the job if more than N functions are newly dead.
+    default: ''
+  max-blast:
+    description: Fail the job if the combined blast radius exceeds N nodes.
+    default: ''
+  entry:
+    description: Extra entry points (file glob or attribute), one per line.
+    default: ''
+  ignore:
+    description: Globs of files whose functions are never reported, one per line.
+    default: ''
+  strict:
+    description: Do not let ambiguous call edges keep a function alive.
+    default: 'false'
+  comment:
+    description: Post or update a sticky PR comment (job summary on fork PRs).
+    default: 'true'
+  sarif:
+    description: Upload SARIF to code scanning (needs `security-events` write).
+    default: 'false'
+  working-directory:
+    description: Directory of the checked-out repository to analyse.
+    default: .
+  db:
+    description: Prebuilt base graph, passed as `--base-db`.
+    default: ''
+  github-token:
+    description: Token for downloading releases, commenting and SARIF upload.
+    default: ${{ github.token }}
+
+outputs:
+  new-dead-count:
+    description: Number of newly dead functions.
+    value: ${{ steps.run.outputs.new-dead-count }}
+  blast-count:
+    description: Combined blast radius node count.
+    value: ${{ steps.run.outputs.blast-count }}
+  exit-code:
+    description: ferrograph exit code (0 ok, 1 threshold exceeded, 2 error).
+    value: ${{ steps.run.outputs.exit-code }}
+  report-path:
+    description: Path to the Markdown report.
+    value: ${{ steps.run.outputs.report-path }}
+
+runs:
+  using: composite
+  steps:
+    - name: Resolve ferrograph version
+      id: resolve
+      shell: bash
+      env:
+        INPUT_VERSION: ${{ inputs.version }}
+        GH_TOKEN: ${{ inputs.github-token }}
+      run: '"$GITHUB_ACTION_PATH/scripts/resolve.sh" >> "$GITHUB_OUTPUT"'
+
+    - name: Cache ferrograph
+      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      with:
+        path: ${{ runner.temp }}/ferrograph-bin
+        key: ferrograph-${{ steps.resolve.outputs.tag }}-${{ steps.resolve.outputs.target }}
+
+    - name: Install ferrograph
+      shell: bash
+      env:
+        TAG: ${{ steps.resolve.outputs.tag }}
+        TARGET: ${{ steps.resolve.outputs.target }}
+        FG_BIN_DIR: ${{ runner.temp }}/ferrograph-bin
+        GH_TOKEN: ${{ inputs.github-token }}
+      run: '"$GITHUB_ACTION_PATH/scripts/install.sh"'
+
+    - name: Run ferrograph pr
+      id: run
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        IN_BASE: ${{ inputs.base }}
+        BASE_REF: ${{ github.base_ref }}
+        IN_FAIL_ON_NEW_DEAD: ${{ inputs.fail-on-new-dead }}
+        IN_MAX_NEW_DEAD: ${{ inputs.max-new-dead }}
+        IN_MAX_BLAST: ${{ inputs.max-blast }}
+        IN_ENTRY: ${{ inputs.entry }}
+        IN_IGNORE: ${{ inputs.ignore }}
+        IN_STRICT: ${{ inputs.strict }}
+        IN_SARIF: ${{ inputs.sarif }}
+        IN_DB: ${{ inputs.db }}
+        FG_OUT: ${{ runner.temp }}/ferrograph-out
+      run: '"$GITHUB_ACTION_PATH/scripts/run.sh"'
+
+    - name: Post PR comment
+      if: ${{ always() && steps.run.outputs.report-path != '' && inputs.comment == 'true' }}
+      shell: bash
+      env:
+        REPORT: ${{ steps.run.outputs.report-path }}
+        REPO: ${{ github.repository }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
+        GH_TOKEN: ${{ inputs.github-token }}
+      run: '"$GITHUB_ACTION_PATH/scripts/comment.sh"'
+
+    - name: Upload SARIF
+      if: ${{ always() && steps.run.outputs.report-path != '' && inputs.sarif == 'true' }}
+      uses: github/codeql-action/upload-sarif@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+      with:
+        sarif_file: ${{ runner.temp }}/ferrograph-out/ferrograph.sarif
+        category: ferrograph
+
+    - name: Enforce thresholds
+      if: ${{ steps.run.outputs.exit-code == '1' && (inputs.fail-on-new-dead == 'true' || inputs.max-new-dead != '' || inputs.max-blast != '') }}
+      shell: bash
+      run: |
+        echo "::error::ferrograph threshold exceeded; see the report above."
+        exit 1
