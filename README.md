@@ -2,6 +2,8 @@
 
 Runs [`ferrograph pr`](https://github.com/GarthDB/ferrograph) on pull requests: reports newly dead functions and blast radius as a sticky PR comment (and optionally SARIF). Advisory by default. Composite action: no Node or Docker.
 
+> **Recommended: advisory mode.** ferrograph's dead-code and blast-radius results are static and name-based, with known false positives and false negatives, so start without thresholds (`fail-on-new-dead`, `max-new-dead`, `max-blast`) and adopt them only after the comments have held up on your own repo. See ferrograph's [Accuracy and limitations](https://github.com/GarthDB/ferrograph#accuracy-and-limitations).
+
 Requires a ferrograph release that includes the `pr` command (v4.0.0 or later). Runners: linux x64, linux arm64, macOS arm64.
 
 ## Quick start
