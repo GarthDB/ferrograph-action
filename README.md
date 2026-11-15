@@ -47,7 +47,7 @@ jobs:
 
 ## Outputs
 
-`new-dead-count`, `blast-count`, `exit-code` (0/1/2), `report-path` (Markdown report).
+`new-dead-count`, `blast-count`, `exit-code` (0/1/2), `report-path` (Markdown report). With a ferrograph release that has `pr` impact reporting (6.0.0), also `impacted-count`, `impacted-tests-count` and `impacted-test-files` (newline-separated, busiest first); they are unset on older releases. The comment's "Impacted by this change" section comes from ferrograph's Markdown report.
 
 ## Behaviour
 

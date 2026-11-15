@@ -50,3 +50,14 @@ fi
   echo "blast-count=$(jq .blast.count "$FG_OUT/report.json")"
   echo "report-path=$FG_OUT/report.md"
 } >> "$GITHUB_OUTPUT"
+
+# Impacted outputs need a ferrograph with `pr` impact reporting; omit them (never 0) on older reports.
+if jq -e '.impacted' "$FG_OUT/report.json" >/dev/null 2>&1; then
+  {
+    echo "impacted-count=$(jq .impacted.count "$FG_OUT/report.json")"
+    echo "impacted-tests-count=$(jq .impacted.tests.count "$FG_OUT/report.json")"
+    echo "impacted-test-files<<FG_EOF"
+    jq -r '.impacted.tests.files[].file' "$FG_OUT/report.json"
+    echo "FG_EOF"
+  } >> "$GITHUB_OUTPUT"
+fi
