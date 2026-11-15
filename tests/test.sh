@@ -9,18 +9,19 @@ check() { # check <name> <expected-exit> <cmd...>
   "$@" >"$tmp/out" 2>&1; local got=$?
   if [ "$got" = "$want" ]; then echo "ok   $name"; else echo "FAIL $name (exit $got, want $want)"; cat "$tmp/out"; fails=$((fails+1)); fi
 }
-has() { if grep -q "$2" "$1"; then echo "ok   $3"; else echo "FAIL $3"; fails=$((fails+1)); fi; }
+has() { if grep -qF -- "$2" "$1"; then echo "ok   $3"; else echo "FAIL $3"; fails=$((fails+1)); fi; }
 
 # OS/arch mapping (explicit versions avoid network)
 # shellcheck disable=SC2329 # invoked through check
-res() { FG_OS="$1" FG_ARCH="$2" INPUT_VERSION="${3:-4.0.0}" "$root/scripts/resolve.sh"; }
+res() { FG_OS="$1" FG_ARCH="$2" INPUT_VERSION="${3:-5.0.0}" "$root/scripts/resolve.sh"; }
 check "linux x64" 0 res Linux x86_64;      has "$tmp/out" target=x86_64-unknown-linux-gnu "x64 target"
 check "linux arm64" 0 res Linux aarch64;   has "$tmp/out" target=aarch64-unknown-linux-gnu "arm64 target"
 check "macOS arm64" 0 res Darwin arm64;    has "$tmp/out" target=aarch64-apple-darwin "mac target"
 check "macOS x64 rejected" 1 res Darwin x86_64
 check "windows rejected" 1 res MINGW64_NT x86_64
-check "bare version" 0 res Linux x86_64 4.0.0;  has "$tmp/out" tag=v4.0.0 "bare version -> v4.0.0"
-check "v-prefixed version" 0 res Linux x86_64 v4.0.0; has "$tmp/out" tag=v4.0.0 "v version kept"
+check "bare version" 0 res Linux x86_64 5.0.0;  has "$tmp/out" tag=v5.0.0 "bare version -> v5.0.0"
+check "v-prefixed version" 0 res Linux x86_64 v5.1.2; has "$tmp/out" tag=v5.1.2 "v version kept"
+check "pre-5.0 version rejected" 1 res Linux x86_64 4.1.0
 check "bad version rejected" 1 res Linux x86_64 '4.0;rm'
 
 # checksums
@@ -56,5 +57,40 @@ has "$tmp/sum" ferrograph "summary fallback on api failure"
 check "fork -> summary" 0 env IS_FORK=true PATH="$tmp/bin:$PATH" FAKE_LOG="$tmp/log" REPORT="$tmp/report.md" REPO=o/r PR_NUMBER=7 GITHUB_STEP_SUMMARY="$tmp/sum" "$root/scripts/comment.sh"
 has "$tmp/sum" ferrograph "fork summary written"
 if [ -s "$tmp/log" ]; then echo "FAIL fork made API calls"; fails=$((fails+1)); else echo "ok   fork makes no API calls"; fi
+
+# run.sh against a fake ferrograph: one invocation, every report from it
+cat > "$tmp/bin/ferrograph" <<'FG'
+#!/usr/bin/env bash
+echo "$*" >> "$FAKE_FG_LOG"
+for a in "$@"; do
+  case "$a" in
+    json=*) echo '{"newly_dead_count":3,"blast":{"count":9}}' > "${a#json=}" ;;
+    markdown=*) echo '<!-- ferrograph -->' > "${a#markdown=}" ;;
+    sarif=*) echo '{}' > "${a#sarif=}" ;;
+  esac
+done
+echo "warn: from fake" >&2
+exit "${FAKE_FG_EXIT:-0}"
+FG
+chmod +x "$tmp/bin/ferrograph"
+repo="$tmp/repo"; mkdir "$repo"
+git -C "$repo" init -q -b main && git -C "$repo" -c user.email=a@b -c user.name=t commit -q --allow-empty -m base
+git -C "$repo" checkout -q -b feature && git -C "$repo" -c user.email=a@b -c user.name=t commit -q --allow-empty -m change
+# shellcheck disable=SC2329 # invoked through check
+runsh() { (cd "$repo" && : > "$tmp/fglog" && : > "$tmp/gho" && PATH="$tmp/bin:$PATH" FAKE_FG_LOG="$tmp/fglog" GITHUB_OUTPUT="$tmp/gho" FG_OUT="$tmp/fgout" IN_BASE=main "$@" "$root/scripts/run.sh"); }
+check "run.sh succeeds" 0 runsh env
+has "$tmp/gho" "exit-code=0" "exit code recorded"
+has "$tmp/gho" "new-dead-count=3" "count from report.json"
+has "$tmp/gho" "blast-count=9" "blast from report.json"
+if [ "$(wc -l < "$tmp/fglog" | tr -d ' ')" = 1 ]; then echo "ok   ferrograph invoked once"; else echo "FAIL ferrograph invoked more than once"; fails=$((fails+1)); fi
+has "$tmp/fglog" "--out json=$tmp/fgout/report.json" "json report via --out"
+has "$tmp/fglog" "--out markdown=$tmp/fgout/report.md" "markdown report via --out"
+grep -q sarif "$tmp/fglog" && { echo "FAIL sarif requested by default"; fails=$((fails+1)); }
+check "run.sh with sarif" 0 runsh env IN_SARIF=true
+has "$tmp/fglog" "--out sarif=$tmp/fgout/ferrograph.sarif" "sarif via --out when enabled"
+check "threshold exit 1 is not a failure here" 0 runsh env FAKE_FG_EXIT=1
+has "$tmp/gho" "exit-code=1" "threshold exit code recorded"
+check "ferrograph error fails" 2 runsh env FAKE_FG_EXIT=2
+has "$tmp/gho" "exit-code=2" "error exit code recorded"
 
 exit "$fails"
