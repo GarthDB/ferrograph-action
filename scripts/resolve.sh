@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # Prints "tag=<vX.Y.Z>" and "target=<triple>" for this runner.
 # Env: INPUT_VERSION (latest|vX.Y.Z|X.Y.Z), GH_TOKEN. Test hooks: FG_OS, FG_ARCH, FG_RELEASES (tag list).
-# `latest` is the newest stable release of the supported major, so a ferrograph 6 never reaches this action version.
+# `latest` is the newest stable release of the supported major, so a ferrograph 7 never reaches this action version.
 set -euo pipefail
 
-SUPPORTED_MAJOR=5
+SUPPORTED_MAJOR=6
 
 os="${FG_OS:-$(uname -s)}"
 arch="${FG_ARCH:-$(uname -m)}"

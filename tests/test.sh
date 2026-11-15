@@ -21,9 +21,9 @@ check "macOS x64 rejected" 1 res Darwin x86_64
 check "windows rejected" 1 res MINGW64_NT x86_64
 check "bare version" 0 res Linux x86_64 5.0.0;  has "$tmp/out" tag=v5.0.0 "bare version -> v5.0.0"
 check "v-prefixed version" 0 res Linux x86_64 v5.1.2; has "$tmp/out" tag=v5.1.2 "v version kept"
-check "latest stays in major 5" 0 env FG_OS=Linux FG_ARCH=x86_64 INPUT_VERSION=latest FG_RELEASES=$'v6.0.0\nv5.2.0\nv5.10.1\nv5.9.0\nv4.9.0' "$root/scripts/resolve.sh"
-has "$tmp/out" tag=v5.10.1 "latest = highest 5.x (version sort)"
-check "latest with no 5.x fails" 1 env FG_OS=Linux FG_ARCH=x86_64 INPUT_VERSION=latest FG_RELEASES=v6.0.0 "$root/scripts/resolve.sh"
+check "latest stays in major 6" 0 env FG_OS=Linux FG_ARCH=x86_64 INPUT_VERSION=latest FG_RELEASES=$'v7.0.0\nv6.2.0\nv6.10.1\nv6.9.0\nv5.9.0' "$root/scripts/resolve.sh"
+has "$tmp/out" tag=v6.10.1 "latest = highest 6.x (version sort)"
+check "latest with no 6.x fails" 1 env FG_OS=Linux FG_ARCH=x86_64 INPUT_VERSION=latest FG_RELEASES=v7.0.0 "$root/scripts/resolve.sh"
 check "pre-5.0 version rejected" 1 res Linux x86_64 4.1.0
 check "bad version rejected" 1 res Linux x86_64 '4.0;rm'
 

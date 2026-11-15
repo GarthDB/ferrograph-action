@@ -7,7 +7,7 @@ branding:
 
 inputs:
   version:
-    description: ferrograph release to use (`latest` = newest stable 5.x, `v5.0.0` or `5.0.0`; 5.0.0 or later).
+    description: ferrograph release to use (`latest` = newest stable 6.x, `v5.0.0` or `5.0.0`; 5.0.0 or later).
     default: latest
   base:
     description: Base ref to diff against. Defaults to `origin/<PR base ref>`.

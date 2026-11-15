@@ -29,7 +29,7 @@ jobs:
 
 | Input | Default | Description |
 |---|---|---|
-| `version` | `latest` | Release to install: `latest` (newest stable 5.x; never a later major), `v5.0.0` or `5.0.0` (5.0.0 or later). |
+| `version` | `latest` | Release to install: `latest` (newest stable 6.x; never a later major), `v5.0.0` or `5.0.0` (5.0.0 or later). |
 | `base` | `origin/<PR base ref>` | Base ref to diff against. |
 | `fail-on-new-dead` | `false` | Fail if any function is newly dead. |
 | `max-new-dead` | | Fail if more than N functions are newly dead. |
