@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Runs `ferrograph pr`, writes reports to $FG_OUT and step outputs to $GITHUB_OUTPUT.
 # Exit 0 for ferrograph exit 0 or 1 (threshold enforcement is a later step); fails on error.
-# Env: IN_BASE, BASE_REF, IN_FAIL_ON_NEW_DEAD, IN_MAX_NEW_DEAD, IN_MAX_BLAST, IN_ENTRY, IN_IGNORE,
+# Env: IN_BASE, BASE_REF, IN_FAIL_ON_NEW_DEAD, IN_MAX_NEW_DEAD, IN_MAX_BLAST, IN_MAX_IMPACTED, IN_IMPACT_DEPTH, IN_ENTRY, IN_IGNORE,
 #      IN_STRICT, IN_SARIF, IN_DB, FG_OUT.
 set -euo pipefail
 
@@ -22,6 +22,8 @@ args=(pr --base "$base" --index-head)
 [ "${IN_FAIL_ON_NEW_DEAD:-false}" = true ] && args+=(--fail-on-new-dead)
 [ -z "${IN_MAX_NEW_DEAD:-}" ] || args+=(--max-new-dead "$IN_MAX_NEW_DEAD")
 [ -z "${IN_MAX_BLAST:-}" ] || args+=(--max-blast "$IN_MAX_BLAST")
+[ -z "${IN_MAX_IMPACTED:-}" ] || args+=(--max-impacted "$IN_MAX_IMPACTED")
+[ -z "${IN_IMPACT_DEPTH:-}" ] || args+=(--impact-depth "$IN_IMPACT_DEPTH")
 [ "${IN_STRICT:-false}" = true ] && args+=(--strict)
 [ -z "${IN_DB:-}" ] || args+=(--base-db "$IN_DB")
 while IFS= read -r line; do [ -z "$line" ] || args+=(--entry "$line"); done <<< "${IN_ENTRY:-}"
