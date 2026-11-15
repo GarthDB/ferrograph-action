@@ -29,7 +29,7 @@ jobs:
 
 | Input | Default | Description |
 |---|---|---|
-| `version` | `latest` | Release to install: `latest`, `v5.0.0` or `5.0.0` (5.0.0 or later). |
+| `version` | `latest` | Release to install: `latest` (newest stable 6.x; never a later major), `v5.0.0` or `5.0.0` (5.0.0 or later). |
 | `base` | `origin/<PR base ref>` | Base ref to diff against. |
 | `fail-on-new-dead` | `false` | Fail if any function is newly dead. |
 | `max-new-dead` | | Fail if more than N functions are newly dead. |
@@ -39,7 +39,13 @@ jobs:
 | `entry` | | Extra entry points (glob or attribute), one per line. |
 | `ignore` | | File globs never reported, one per line. |
 | `strict` | `false` | Ambiguous call edges do not keep functions alive. |
-| `comment` | `true` | Post/update the sticky comment. |
+| `exclude-low-confidence` | `false` | Leave low-confidence call edges out of the blast radius. |
+| `blast-limit` | | Cap on blast radius nodes listed. |
+| `markdown-limit` | | Cap on rows per Markdown table. |
+| `restricted-vis-not-root` | `default` | `default`, `true` or `false`: whether `pub(crate)` functions are dead-code candidates. `false` restores the 4.x behaviour. |
+| `bin-pub-not-root` | `default` | `default`, `true` or `false`: same for bare `pub` functions in binary-only code. |
+| `extra-args` | | Extra `ferrograph pr` flags, one argument per line (a flag and its value on separate lines). |
+| `comment` | `true` | `always` (or `true`), `findings` or `false`. `findings` posts only when a function is newly dead or changed; an existing comment is still updated. |
 | `sarif` | `false` | Upload SARIF to code scanning. |
 | `working-directory` | `.` | Checked-out repo directory to analyse. |
 | `db` | | Prebuilt base graph (`--base-db`). |

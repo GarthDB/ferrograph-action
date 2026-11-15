@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Runs `ferrograph pr`, writes reports to $FG_OUT and step outputs to $GITHUB_OUTPUT.
 # Exit 0 for ferrograph exit 0 or 1 (threshold enforcement is a later step); fails on error.
-# Env: IN_BASE, BASE_REF, IN_FAIL_ON_NEW_DEAD, IN_MAX_NEW_DEAD, IN_MAX_BLAST, IN_MAX_IMPACTED, IN_IMPACT_DEPTH, IN_ENTRY, IN_IGNORE,
-#      IN_STRICT, IN_SARIF, IN_DB, FG_OUT.
+# Env: IN_BASE, BASE_REF, IN_FAIL_ON_NEW_DEAD, IN_MAX_NEW_DEAD, IN_MAX_BLAST, IN_MAX_IMPACTED, IN_IMPACT_DEPTH,
+#      IN_ENTRY, IN_IGNORE, IN_STRICT, IN_SARIF, IN_DB, IN_EXCLUDE_LOW_CONFIDENCE, IN_BLAST_LIMIT,
+#      IN_MARKDOWN_LIMIT, IN_RESTRICTED_VIS_NOT_ROOT, IN_BIN_PUB_NOT_ROOT (default|true|false),
+#      IN_EXTRA_ARGS, FG_OUT.
 set -euo pipefail
 
 mkdir -p "$FG_OUT"
@@ -25,9 +27,23 @@ args=(pr --base "$base" --index-head)
 [ -z "${IN_MAX_IMPACTED:-}" ] || args+=(--max-impacted "$IN_MAX_IMPACTED")
 [ -z "${IN_IMPACT_DEPTH:-}" ] || args+=(--impact-depth "$IN_IMPACT_DEPTH")
 [ "${IN_STRICT:-false}" = true ] && args+=(--strict)
+[ "${IN_EXCLUDE_LOW_CONFIDENCE:-false}" = true ] && args+=(--exclude-low-confidence)
+[ -z "${IN_BLAST_LIMIT:-}" ] || args+=(--blast-limit "$IN_BLAST_LIMIT")
+[ -z "${IN_MARKDOWN_LIMIT:-}" ] || args+=(--markdown-limit "$IN_MARKDOWN_LIMIT")
+tri() { # tri <value> <flag>: true -> --flag, false -> --no-flag, else nothing
+  case "${1:-default}" in
+    true) args+=("--$2") ;;
+    false) args+=("--no-$2") ;;
+    default | '') ;;
+    *) echo "::error::Input for '$2' must be default, true or false." >&2; exit 2 ;;
+  esac
+}
+tri "${IN_RESTRICTED_VIS_NOT_ROOT:-}" restricted-vis-not-root
+tri "${IN_BIN_PUB_NOT_ROOT:-}" bin-pub-not-root
 [ -z "${IN_DB:-}" ] || args+=(--base-db "$IN_DB")
 while IFS= read -r line; do [ -z "$line" ] || args+=(--entry "$line"); done <<< "${IN_ENTRY:-}"
 while IFS= read -r line; do [ -z "$line" ] || args+=(--ignore "$line"); done <<< "${IN_IGNORE:-}"
+while IFS= read -r line; do [ -z "$line" ] || args+=("$line"); done <<< "${IN_EXTRA_ARGS:-}"
 
 # One ferrograph run writes every report (one index of HEAD and base), so there is one exit code.
 args+=(--out "json=$FG_OUT/report.json" --out "markdown=$FG_OUT/report.md")
