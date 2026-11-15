@@ -59,6 +59,15 @@ outputs:
   blast-count:
     description: Combined blast radius node count.
     value: ${{ steps.run.outputs.blast-count }}
+  impacted-count:
+    description: Functions impacted by the change (transitive callers of the changed functions; name-based, may over-count). Unset with a ferrograph release older than 6.0.0.
+    value: ${{ steps.run.outputs.impacted-count }}
+  impacted-tests-count:
+    description: Impacted functions that are tests (under `tests/` or `#[test]`).
+    value: ${{ steps.run.outputs.impacted-tests-count }}
+  impacted-test-files:
+    description: Files containing impacted tests, one per line, busiest first.
+    value: ${{ steps.run.outputs.impacted-test-files }}
   exit-code:
     description: ferrograph exit code (0 ok, 1 threshold exceeded, 2 error).
     value: ${{ steps.run.outputs.exit-code }}
