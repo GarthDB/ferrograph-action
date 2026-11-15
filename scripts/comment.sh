@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Sticky PR comment: update the comment containing the marker, else create one.
 # Falls back to the job summary on fork PRs, non-PR events, or any API failure; never fails.
-# Env: REPORT, REPO, PR_NUMBER, IS_FORK, GH_TOKEN, GITHUB_STEP_SUMMARY.
+# Env: REPORT, REPO, COMMENT_MODE (always|findings; default always), PR_NUMBER, IS_FORK, GH_TOKEN, GITHUB_STEP_SUMMARY.
 set -uo pipefail
 
 MARKER='<!-- ferrograph -->'
@@ -15,6 +15,12 @@ fi
 
 api="repos/$REPO/issues"
 id="$(gh api --paginate "$api/$PR_NUMBER/comments" --jq ".[] | select(.body | contains(\"$MARKER\")) | .id" 2>/dev/null | sed -n 1p)"
+if [ "${COMMENT_MODE:-always}" = findings ] && [ -z "$id" ] &&
+  ! jq -e '(.newly_dead_count > 0) or ((.changed_functions | length) > 0)' "$(dirname "$REPORT")/report.json" >/dev/null 2>&1; then
+  echo "Nothing to report; not commenting."
+  summary
+  exit 0
+fi
 if [ -n "$id" ]; then
   gh api --method PATCH "$api/comments/$id" --field "body=@$REPORT" >/dev/null
 else

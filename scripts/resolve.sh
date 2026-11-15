@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Prints "tag=<vX.Y.Z>" and "target=<triple>" for this runner.
-# Env: INPUT_VERSION (latest|vX.Y.Z|X.Y.Z), GH_TOKEN. Test hooks: FG_OS, FG_ARCH.
+# Env: INPUT_VERSION (latest|vX.Y.Z|X.Y.Z), GH_TOKEN. Test hooks: FG_OS, FG_ARCH, FG_RELEASES (tag list).
+# `latest` is the newest stable release of the supported major, so a ferrograph 6 never reaches this action version.
 set -euo pipefail
+
+SUPPORTED_MAJOR=5
 
 os="${FG_OS:-$(uname -s)}"
 arch="${FG_ARCH:-$(uname -m)}"
@@ -14,7 +17,9 @@ esac
 
 version="${INPUT_VERSION:-latest}"
 if [ "$version" = latest ]; then
-  tag="$(gh release view --repo GarthDB/ferrograph --json tagName --jq .tagName)"
+  releases="${FG_RELEASES:-$(gh release list --repo GarthDB/ferrograph --limit 100 --exclude-drafts --exclude-pre-releases --json tagName --jq '.[].tagName')}"
+  tag="$(grep -E "^v$SUPPORTED_MAJOR\\.[0-9]+\\.[0-9]+\$" <<< "$releases" | sort -V | tail -n 1 || true)"
+  [ -n "$tag" ] || { echo "::error::No stable ferrograph v$SUPPORTED_MAJOR release found; set the 'version' input." >&2; exit 1; }
 else
   tag="v${version#v}"
 fi

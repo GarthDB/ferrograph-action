@@ -21,6 +21,9 @@ check "macOS x64 rejected" 1 res Darwin x86_64
 check "windows rejected" 1 res MINGW64_NT x86_64
 check "bare version" 0 res Linux x86_64 5.0.0;  has "$tmp/out" tag=v5.0.0 "bare version -> v5.0.0"
 check "v-prefixed version" 0 res Linux x86_64 v5.1.2; has "$tmp/out" tag=v5.1.2 "v version kept"
+check "latest stays in major 5" 0 env FG_OS=Linux FG_ARCH=x86_64 INPUT_VERSION=latest FG_RELEASES=$'v6.0.0\nv5.2.0\nv5.10.1\nv5.9.0\nv4.9.0' "$root/scripts/resolve.sh"
+has "$tmp/out" tag=v5.10.1 "latest = highest 5.x (version sort)"
+check "latest with no 5.x fails" 1 env FG_OS=Linux FG_ARCH=x86_64 INPUT_VERSION=latest FG_RELEASES=v6.0.0 "$root/scripts/resolve.sh"
 check "pre-5.0 version rejected" 1 res Linux x86_64 4.1.0
 check "bad version rejected" 1 res Linux x86_64 '4.0;rm'
 
@@ -57,6 +60,18 @@ has "$tmp/sum" ferrograph "summary fallback on api failure"
 check "fork -> summary" 0 env IS_FORK=true PATH="$tmp/bin:$PATH" FAKE_LOG="$tmp/log" REPORT="$tmp/report.md" REPO=o/r PR_NUMBER=7 GITHUB_STEP_SUMMARY="$tmp/sum" "$root/scripts/comment.sh"
 has "$tmp/sum" ferrograph "fork summary written"
 if [ -s "$tmp/log" ]; then echo "FAIL fork made API calls"; fails=$((fails+1)); else echo "ok   fork makes no API calls"; fi
+# findings mode: empty report -> no POST (summary only); existing comment -> PATCH
+echo '{"newly_dead_count":0,"changed_functions":[]}' > "$tmp/report.json"
+: > "$tmp/log"; : > "$tmp/sum"
+COMMENT_MODE=findings check "findings: empty report is quiet" 0 cm
+if grep -q POST "$tmp/log"; then echo "FAIL findings posted empty"; fails=$((fails+1)); else echo "ok   findings makes no POST"; fi
+has "$tmp/sum" ferrograph "findings: summary still written"
+: > "$tmp/log"
+COMMENT_MODE=findings FAKE_EXISTING=42 check "findings: updates stale comment" 0 cm; has "$tmp/log" "PATCH repos/o/r/issues/comments/42" "findings PATCH existing"
+: > "$tmp/log"
+echo '{"newly_dead_count":0,"changed_functions":[{}]}' > "$tmp/report.json"
+COMMENT_MODE=findings check "findings: posts on changed fn" 0 cm; has "$tmp/log" "POST repos/o/r/issues/7/comments" "findings POST with changes"
+rm "$tmp/report.json"
 
 # run.sh against a fake ferrograph: one invocation, every report from it
 cat > "$tmp/bin/ferrograph" <<'FG'
@@ -92,5 +107,12 @@ check "threshold exit 1 is not a failure here" 0 runsh env FAKE_FG_EXIT=1
 has "$tmp/gho" "exit-code=1" "threshold exit code recorded"
 check "ferrograph error fails" 2 runsh env FAKE_FG_EXIT=2
 has "$tmp/gho" "exit-code=2" "error exit code recorded"
+
+check "pr flag inputs" 0 runsh env IN_EXCLUDE_LOW_CONFIDENCE=true IN_BLAST_LIMIT=50 IN_MARKDOWN_LIMIT=20 IN_RESTRICTED_VIS_NOT_ROOT=false IN_BIN_PUB_NOT_ROOT=true IN_EXTRA_ARGS=$'--max-impacted\n10'
+has "$tmp/fglog" "--exclude-low-confidence --blast-limit 50 --markdown-limit 20 --no-restricted-vis-not-root --bin-pub-not-root" "flags passed"
+has "$tmp/fglog" "--max-impacted 10 --out" "extra-args appended before --out"
+check "tri-state default adds nothing" 0 runsh env IN_RESTRICTED_VIS_NOT_ROOT=default
+grep -q "vis-not-root" "$tmp/fglog" && { echo "FAIL default tri-state emitted a flag"; fails=$((fails+1)); }
+check "bad tri-state rejected" 2 runsh env IN_BIN_PUB_NOT_ROOT=maybe
 
 exit "$fails"

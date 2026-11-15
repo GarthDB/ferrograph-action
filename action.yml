@@ -7,7 +7,7 @@ branding:
 
 inputs:
   version:
-    description: ferrograph release to use (`latest`, `v5.0.0` or `5.0.0`; 5.0.0 or later).
+    description: ferrograph release to use (`latest` = newest stable 5.x, `v5.0.0` or `5.0.0`; 5.0.0 or later).
     default: latest
   base:
     description: Base ref to diff against. Defaults to `origin/<PR base ref>`.
@@ -30,8 +30,26 @@ inputs:
   strict:
     description: Do not let ambiguous call edges keep a function alive.
     default: 'false'
+  exclude-low-confidence:
+    description: Leave low-confidence call edges out of the blast radius.
+    default: 'false'
+  blast-limit:
+    description: Cap on blast radius nodes listed (`--blast-limit`).
+    default: ''
+  markdown-limit:
+    description: Cap on rows per Markdown table (`--markdown-limit`).
+    default: ''
+  restricted-vis-not-root:
+    description: Treat `pub(crate)` functions as dead-code candidates - `default`, `true` or `false`.
+    default: default
+  bin-pub-not-root:
+    description: Treat bare `pub` functions in binary-only code as dead-code candidates - `default`, `true` or `false`.
+    default: default
+  extra-args:
+    description: Extra `ferrograph pr` flags, one argument per line (e.g. `--max-impacted` then `10` on separate lines).
+    default: ''
   comment:
-    description: Post or update a sticky PR comment (job summary on fork PRs).
+    description: Sticky PR comment mode - `always` (or `true`), `findings` (only when something is newly dead or a function changed; an existing comment is still updated) or `false`. Job summary on fork PRs.
     default: 'true'
   sarif:
     description: Upload SARIF to code scanning (needs `security-events` write).
@@ -101,14 +119,21 @@ runs:
         IN_STRICT: ${{ inputs.strict }}
         IN_SARIF: ${{ inputs.sarif }}
         IN_DB: ${{ inputs.db }}
+        IN_EXCLUDE_LOW_CONFIDENCE: ${{ inputs.exclude-low-confidence }}
+        IN_BLAST_LIMIT: ${{ inputs.blast-limit }}
+        IN_MARKDOWN_LIMIT: ${{ inputs.markdown-limit }}
+        IN_RESTRICTED_VIS_NOT_ROOT: ${{ inputs.restricted-vis-not-root }}
+        IN_BIN_PUB_NOT_ROOT: ${{ inputs.bin-pub-not-root }}
+        IN_EXTRA_ARGS: ${{ inputs.extra-args }}
         FG_OUT: ${{ runner.temp }}/ferrograph-out
       run: '"$GITHUB_ACTION_PATH/scripts/run.sh"'
 
     - name: Post PR comment
-      if: ${{ always() && steps.run.outputs.report-path != '' && inputs.comment == 'true' }}
+      if: ${{ always() && steps.run.outputs.report-path != '' && inputs.comment != 'false' }}
       shell: bash
       env:
         REPORT: ${{ steps.run.outputs.report-path }}
+        COMMENT_MODE: ${{ inputs.comment }}
         REPO: ${{ github.repository }}
         PR_NUMBER: ${{ github.event.pull_request.number }}
         IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
