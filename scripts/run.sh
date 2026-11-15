@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # Runs `ferrograph pr`, writes reports to $FG_OUT and step outputs to $GITHUB_OUTPUT.
 # Exit 0 for ferrograph exit 0 or 1 (threshold enforcement is a later step); fails on error.
-# Env: IN_BASE, BASE_REF, IN_FAIL_ON_NEW_DEAD, IN_MAX_NEW_DEAD, IN_MAX_BLAST, IN_ENTRY, IN_IGNORE,
-#      IN_STRICT, IN_SARIF, IN_DB, IN_EXCLUDE_LOW_CONFIDENCE, IN_BLAST_LIMIT, IN_MARKDOWN_LIMIT,
-#      IN_RESTRICTED_VIS_NOT_ROOT, IN_BIN_PUB_NOT_ROOT (default|true|false), IN_EXTRA_ARGS, FG_OUT.
+# Env: IN_BASE, BASE_REF, IN_FAIL_ON_NEW_DEAD, IN_MAX_NEW_DEAD, IN_MAX_BLAST, IN_MAX_IMPACTED, IN_IMPACT_DEPTH,
+#      IN_ENTRY, IN_IGNORE, IN_STRICT, IN_SARIF, IN_DB, IN_EXCLUDE_LOW_CONFIDENCE, IN_BLAST_LIMIT,
+#      IN_MARKDOWN_LIMIT, IN_RESTRICTED_VIS_NOT_ROOT, IN_BIN_PUB_NOT_ROOT (default|true|false),
+#      IN_EXTRA_ARGS, FG_OUT.
 set -euo pipefail
 
 mkdir -p "$FG_OUT"
@@ -23,6 +24,8 @@ args=(pr --base "$base" --index-head)
 [ "${IN_FAIL_ON_NEW_DEAD:-false}" = true ] && args+=(--fail-on-new-dead)
 [ -z "${IN_MAX_NEW_DEAD:-}" ] || args+=(--max-new-dead "$IN_MAX_NEW_DEAD")
 [ -z "${IN_MAX_BLAST:-}" ] || args+=(--max-blast "$IN_MAX_BLAST")
+[ -z "${IN_MAX_IMPACTED:-}" ] || args+=(--max-impacted "$IN_MAX_IMPACTED")
+[ -z "${IN_IMPACT_DEPTH:-}" ] || args+=(--impact-depth "$IN_IMPACT_DEPTH")
 [ "${IN_STRICT:-false}" = true ] && args+=(--strict)
 [ "${IN_EXCLUDE_LOW_CONFIDENCE:-false}" = true ] && args+=(--exclude-low-confidence)
 [ -z "${IN_BLAST_LIMIT:-}" ] || args+=(--blast-limit "$IN_BLAST_LIMIT")
@@ -63,3 +66,14 @@ fi
   echo "blast-count=$(jq .blast.count "$FG_OUT/report.json")"
   echo "report-path=$FG_OUT/report.md"
 } >> "$GITHUB_OUTPUT"
+
+# Impacted outputs need a ferrograph with `pr` impact reporting; omit them (never 0) on older reports.
+if jq -e '.impacted' "$FG_OUT/report.json" >/dev/null 2>&1; then
+  {
+    echo "impacted-count=$(jq .impacted.count "$FG_OUT/report.json")"
+    echo "impacted-tests-count=$(jq .impacted.tests.count "$FG_OUT/report.json")"
+    echo "impacted-test-files<<FG_EOF"
+    jq -r '.impacted.tests.files[].file' "$FG_OUT/report.json"
+    echo "FG_EOF"
+  } >> "$GITHUB_OUTPUT"
+fi

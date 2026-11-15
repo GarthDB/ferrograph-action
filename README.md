@@ -33,7 +33,9 @@ jobs:
 | `base` | `origin/<PR base ref>` | Base ref to diff against. |
 | `fail-on-new-dead` | `false` | Fail if any function is newly dead. |
 | `max-new-dead` | | Fail if more than N functions are newly dead. |
-| `max-blast` | | Fail if the combined blast radius exceeds N nodes. |
+| `max-blast` | | Fail if the combined blast radius exceeds N nodes. This is what the changed code *depends on*, not the callers it impacts. |
+| `max-impacted` | | Fail if more than N functions are impacted (callers of the changed functions; name-based, may over-count). Needs a ferrograph release with `--max-impacted`. |
+| `impact-depth` | | Caller hops for the impacted set (1-100); empty uses ferrograph's default. Needs a ferrograph release newer than 5.0.0. |
 | `entry` | | Extra entry points (glob or attribute), one per line. |
 | `ignore` | | File globs never reported, one per line. |
 | `strict` | `false` | Ambiguous call edges do not keep functions alive. |
@@ -51,7 +53,7 @@ jobs:
 
 ## Outputs
 
-`new-dead-count`, `blast-count`, `exit-code` (0/1/2), `report-path` (Markdown report).
+`new-dead-count`, `blast-count`, `exit-code` (0/1/2), `report-path` (Markdown report). With a ferrograph release that has `pr` impact reporting (6.0.0), also `impacted-count`, `impacted-tests-count` and `impacted-test-files` (newline-separated, busiest first); they are unset on older releases. The comment's "Impacted by this change" section comes from ferrograph's Markdown report.
 
 ## Behaviour
 

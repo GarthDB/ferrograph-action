@@ -79,7 +79,7 @@ cat > "$tmp/bin/ferrograph" <<'FG'
 echo "$*" >> "$FAKE_FG_LOG"
 for a in "$@"; do
   case "$a" in
-    json=*) echo '{"newly_dead_count":3,"blast":{"count":9}}' > "${a#json=}" ;;
+    json=*) if [ -n "${FAKE_IMPACT:-}" ]; then echo '{"newly_dead_count":3,"blast":{"count":9},"impacted":{"count":4,"tests":{"count":3,"files":[{"file":"tests/a.rs","count":2},{"file":"tests/b.rs","count":1}]}}}' > "${a#json=}"; else echo '{"newly_dead_count":3,"blast":{"count":9}}' > "${a#json=}"; fi ;;
     markdown=*) echo '<!-- ferrograph -->' > "${a#markdown=}" ;;
     sarif=*) echo '{}' > "${a#sarif=}" ;;
   esac
@@ -101,6 +101,18 @@ if [ "$(wc -l < "$tmp/fglog" | tr -d ' ')" = 1 ]; then echo "ok   ferrograph inv
 has "$tmp/fglog" "--out json=$tmp/fgout/report.json" "json report via --out"
 has "$tmp/fglog" "--out markdown=$tmp/fgout/report.md" "markdown report via --out"
 grep -q sarif "$tmp/fglog" && { echo "FAIL sarif requested by default"; fails=$((fails+1)); }
+check "run.sh impacted outputs" 0 runsh env FAKE_IMPACT=1
+has "$tmp/gho" "impacted-count=4" "impacted-count output"
+has "$tmp/gho" "impacted-tests-count=3" "impacted-tests-count output"
+has "$tmp/gho" "tests/b.rs" "impacted-test-files output"
+check "run.sh old report" 0 runsh env
+grep -q impacted "$tmp/gho" && { echo "FAIL impacted outputs set for an old report"; fails=$((fails+1)); }
+check "run.sh passes impact-depth" 0 runsh env IN_IMPACT_DEPTH=2
+has "$tmp/fglog" "--impact-depth 2" "impact-depth forwarded"
+check "run.sh passes max-impacted" 0 runsh env IN_MAX_IMPACTED=5
+has "$tmp/fglog" "--max-impacted 5" "max-impacted forwarded"
+check "run.sh without impact-depth" 0 runsh env
+grep -q impact-depth "$tmp/fglog" && { echo "FAIL impact-depth sent by default"; fails=$((fails+1)); }
 check "run.sh with sarif" 0 runsh env IN_SARIF=true
 has "$tmp/fglog" "--out sarif=$tmp/fgout/ferrograph.sarif" "sarif via --out when enabled"
 check "threshold exit 1 is not a failure here" 0 runsh env FAKE_FG_EXIT=1
