@@ -19,7 +19,10 @@ inputs:
     description: Fail the job if more than N functions are newly dead.
     default: ''
   max-blast:
-    description: Fail the job if the combined blast radius exceeds N nodes.
+    description: Fail the job if the combined blast radius (what the changed code depends on, not the callers it impacts) exceeds N nodes.
+    default: ''
+  impact-depth:
+    description: Caller hops followed for the impacted set (1-100). Empty uses ferrograph's default (3). Needs a ferrograph release with `pr` impact reporting (after 5.0.0).
     default: ''
   entry:
     description: Extra entry points (file glob or attribute), one per line.
@@ -96,6 +99,7 @@ runs:
         IN_FAIL_ON_NEW_DEAD: ${{ inputs.fail-on-new-dead }}
         IN_MAX_NEW_DEAD: ${{ inputs.max-new-dead }}
         IN_MAX_BLAST: ${{ inputs.max-blast }}
+        IN_IMPACT_DEPTH: ${{ inputs.impact-depth }}
         IN_ENTRY: ${{ inputs.entry }}
         IN_IGNORE: ${{ inputs.ignore }}
         IN_STRICT: ${{ inputs.strict }}

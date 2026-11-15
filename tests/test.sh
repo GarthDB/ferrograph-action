@@ -86,6 +86,10 @@ if [ "$(wc -l < "$tmp/fglog" | tr -d ' ')" = 1 ]; then echo "ok   ferrograph inv
 has "$tmp/fglog" "--out json=$tmp/fgout/report.json" "json report via --out"
 has "$tmp/fglog" "--out markdown=$tmp/fgout/report.md" "markdown report via --out"
 grep -q sarif "$tmp/fglog" && { echo "FAIL sarif requested by default"; fails=$((fails+1)); }
+check "run.sh passes impact-depth" 0 runsh env IN_IMPACT_DEPTH=2
+has "$tmp/fglog" "--impact-depth 2" "impact-depth forwarded"
+check "run.sh without impact-depth" 0 runsh env
+grep -q impact-depth "$tmp/fglog" && { echo "FAIL impact-depth sent by default"; fails=$((fails+1)); }
 check "run.sh with sarif" 0 runsh env IN_SARIF=true
 has "$tmp/fglog" "--out sarif=$tmp/fgout/ferrograph.sarif" "sarif via --out when enabled"
 check "threshold exit 1 is not a failure here" 0 runsh env FAKE_FG_EXIT=1
