@@ -4,7 +4,7 @@ Runs [`ferrograph pr`](https://github.com/GarthDB/ferrograph) on pull requests: 
 
 > **Recommended: advisory mode.** ferrograph's dead-code and blast-radius results are static and name-based, with known false positives and false negatives, so start without thresholds (`fail-on-new-dead`, `max-new-dead`, `max-blast`) and adopt them only after the comments have held up on your own repo. See ferrograph's [Accuracy and limitations](https://github.com/GarthDB/ferrograph#accuracy-and-limitations).
 
-Requires ferrograph v5.0.0 or later (`pr --out`, one run for every report format). Runners: linux x64, linux arm64, macOS arm64.
+Requires ferrograph v5.0.0 or later (`pr --out`, one run for every report format). Runners: linux x64, linux arm64, macOS arm64. Self-hosted runners need Actions runner 2.327.1 or newer (the action uses `actions/cache` v6, which runs on Node 24).
 
 ## Quick start
 
