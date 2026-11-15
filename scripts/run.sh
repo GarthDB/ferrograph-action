@@ -27,24 +27,19 @@ args=(pr --base "$base" --index-head)
 while IFS= read -r line; do [ -z "$line" ] || args+=(--entry "$line"); done <<< "${IN_ENTRY:-}"
 while IFS= read -r line; do [ -z "$line" ] || args+=(--ignore "$line"); done <<< "${IN_IGNORE:-}"
 
-run() { # run <format> <outfile>; sets $code, stderr in $FG_OUT/stderr.txt
-  set +e
-  ferrograph "${args[@]}" --format "$1" > "$2" 2> "$FG_OUT/stderr.txt"
-  code=$?
-  set -e
-  cat "$FG_OUT/stderr.txt" >&2
-  if [ "$code" -gt 1 ]; then
-    echo "::error::ferrograph failed (exit $code): $(tr '\n' ' ' < "$FG_OUT/stderr.txt")" >&2
-    echo "exit-code=$code" >> "$GITHUB_OUTPUT"
-    exit "$code"
-  fi
-}
+# One ferrograph run writes every report (one index of HEAD and base), so there is one exit code.
+args+=(--out "json=$FG_OUT/report.json" --out "markdown=$FG_OUT/report.md")
+[ "${IN_SARIF:-false}" = true ] && args+=(--out "sarif=$FG_OUT/ferrograph.sarif")
 
-run json "$FG_OUT/report.json"
-run markdown "$FG_OUT/report.md"
-# shortcut: each format re-indexes HEAD and base, ferrograph has no single-pass multi-format output; upgrade if it gains one
-if [ "${IN_SARIF:-false}" = true ]; then
-  run sarif "$FG_OUT/ferrograph.sarif"
+set +e
+ferrograph "${args[@]}" 2> "$FG_OUT/stderr.txt"
+code=$?
+set -e
+cat "$FG_OUT/stderr.txt" >&2
+if [ "$code" -gt 1 ]; then
+  echo "::error::ferrograph failed (exit $code): $(tr '\n' ' ' < "$FG_OUT/stderr.txt")" >&2
+  echo "exit-code=$code" >> "$GITHUB_OUTPUT"
+  exit "$code"
 fi
 
 {

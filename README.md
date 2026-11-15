@@ -4,7 +4,7 @@ Runs [`ferrograph pr`](https://github.com/GarthDB/ferrograph) on pull requests: 
 
 > **Recommended: advisory mode.** ferrograph's dead-code and blast-radius results are static and name-based, with known false positives and false negatives, so start without thresholds (`fail-on-new-dead`, `max-new-dead`, `max-blast`) and adopt them only after the comments have held up on your own repo. See ferrograph's [Accuracy and limitations](https://github.com/GarthDB/ferrograph#accuracy-and-limitations).
 
-Requires a ferrograph release that includes the `pr` command (v4.0.0 or later). Runners: linux x64, linux arm64, macOS arm64.
+Requires ferrograph v5.0.0 or later (`pr --out`, one run for every report format). Runners: linux x64, linux arm64, macOS arm64. Self-hosted runners need Actions runner 2.327.1 or newer (the action uses `actions/cache` v6, which runs on Node 24).
 
 ## Quick start
 
@@ -29,7 +29,7 @@ jobs:
 
 | Input | Default | Description |
 |---|---|---|
-| `version` | `latest` | Release to install: `latest`, `v4.0.0` or `4.0.0`. |
+| `version` | `latest` | Release to install: `latest`, `v5.0.0` or `5.0.0` (5.0.0 or later). |
 | `base` | `origin/<PR base ref>` | Base ref to diff against. |
 | `fail-on-new-dead` | `false` | Fail if any function is newly dead. |
 | `max-new-dead` | | Fail if more than N functions are newly dead. |
@@ -54,11 +54,12 @@ jobs:
 - **Fork PRs / read-only tokens / non-PR events:** no comment; the same Markdown goes to the job summary. Commenting never fails the job.
 - **SARIF:** `sarif: true` uploads via `github/codeql-action/upload-sarif`; needs `security-events: write`.
 - **Install:** the tarball is checked against the release `SHA256SUMS`; a mismatch fails the job. Binaries are cached per version and target (`latest` is re-resolved every run).
-- Note: ferrograph is run once per output format, so HEAD and base are indexed more than once.
+- **One run:** ferrograph runs once and writes the JSON, Markdown and (if enabled) SARIF reports together, so HEAD and base are each indexed once and the reports always agree.
+- **ferrograph 5.0 defaults:** `pub(crate)` functions and bare `pub` functions in binary-only code are now dead-code candidates, so reports and thresholds see more functions than with 4.x. With `strict: true` both rules stay off. See ferrograph's [CHANGELOG](https://github.com/GarthDB/ferrograph/blob/main/CHANGELOG.md).
 
 ## Pinning
 
-Use `@v1` for fixes, or pin a full commit SHA (`uses: GarthDB/ferrograph-action@<sha> # v1.x.y`) and a fixed `version: v4.0.0` for reproducible runs.
+Use `@v1` for fixes, or pin a full commit SHA (`uses: GarthDB/ferrograph-action@<sha> # v1.x.y`) and a fixed `version: v5.0.0` for reproducible runs.
 
 ## Troubleshooting
 

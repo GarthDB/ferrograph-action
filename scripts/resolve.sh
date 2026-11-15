@@ -20,5 +20,9 @@ else
 fi
 [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]] || { echo "::error::Invalid version '$version'" >&2; exit 1; }
 
+# `pr --out` (one run, several reports) arrived in 5.0.0.
+major="${tag#v}"; major="${major%%.*}"
+[ "$major" -ge 5 ] || { echo "::error::ferrograph $tag is too old: this action needs v5.0.0 or later (pr --out)." >&2; exit 1; }
+
 echo "tag=$tag"
 echo "target=$target"
