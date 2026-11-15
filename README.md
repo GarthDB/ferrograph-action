@@ -19,10 +19,10 @@ jobs:
   ferrograph:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0   # required: the base ref and merge base must exist
-      - uses: GarthDB/ferrograph-action@v1
+      - uses: GarthDB/ferrograph-action@v2
 ```
 
 ## Inputs
@@ -59,7 +59,7 @@ jobs:
 
 ## Pinning
 
-Use `@v1` for fixes, or pin a full commit SHA (`uses: GarthDB/ferrograph-action@<sha> # v1.x.y`) and a fixed `version: v5.0.0` for reproducible runs.
+Use `@v2` for fixes, or pin a full commit SHA (`uses: GarthDB/ferrograph-action@<sha> # v2.x.y`) and a fixed `version: v5.0.0` for reproducible runs.
 
 ## Troubleshooting
 
@@ -69,4 +69,8 @@ Use `@v1` for fixes, or pin a full commit SHA (`uses: GarthDB/ferrograph-action@
 
 ## Releasing (maintainers)
 
-Tag `v1.0.0` after the dogfood workflow passes on all three runners, then move the floating `v1` tag to each new `v1.x.y`. Marketplace publishing is a manual release-page step.
+Tag a release `vX.Y.Z` after the dogfood workflow passes on all three runners, then move the floating `vX` tag to it. A change that stops supporting inputs that used to work (such as the ferrograph 5.0.0 requirement in v2) gets a new major: keep the old floating tag where it is. Marketplace publishing is a manual release-page step.
+
+## Upgrading from v1
+
+`v2` runs ferrograph once for all reports and needs ferrograph v5.0.0 or later: change `@v1` to `@v2`, and drop or raise any `version:` input below `v5.0.0`. `@v1` keeps its old behaviour (one run per report format) and still works with ferrograph 5.0.0.
