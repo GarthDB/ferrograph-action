@@ -21,6 +21,9 @@ inputs:
   max-blast:
     description: Fail the job if the combined blast radius (what the changed code depends on, not the callers it impacts) exceeds N nodes.
     default: ''
+  max-impacted:
+    description: Fail the job if more than N functions are impacted (transitive callers of the changed functions; name-based, so it can over-count). Needs a ferrograph release with `--max-impacted`.
+    default: ''
   impact-depth:
     description: Caller hops followed for the impacted set (1-100). Empty uses ferrograph's default (3). Needs a ferrograph release with `pr` impact reporting (after 5.0.0).
     default: ''
@@ -99,6 +102,7 @@ runs:
         IN_FAIL_ON_NEW_DEAD: ${{ inputs.fail-on-new-dead }}
         IN_MAX_NEW_DEAD: ${{ inputs.max-new-dead }}
         IN_MAX_BLAST: ${{ inputs.max-blast }}
+        IN_MAX_IMPACTED: ${{ inputs.max-impacted }}
         IN_IMPACT_DEPTH: ${{ inputs.impact-depth }}
         IN_ENTRY: ${{ inputs.entry }}
         IN_IGNORE: ${{ inputs.ignore }}
@@ -127,7 +131,7 @@ runs:
         category: ferrograph
 
     - name: Enforce thresholds
-      if: ${{ steps.run.outputs.exit-code == '1' && (inputs.fail-on-new-dead == 'true' || inputs.max-new-dead != '' || inputs.max-blast != '') }}
+      if: ${{ steps.run.outputs.exit-code == '1' && (inputs.fail-on-new-dead == 'true' || inputs.max-new-dead != '' || inputs.max-blast != '' || inputs.max-impacted != '') }}
       shell: bash
       run: |
         echo "::error::ferrograph threshold exceeded; see the report above."
