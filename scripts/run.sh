@@ -76,4 +76,9 @@ if jq -e '.impacted' "$FG_OUT/report.json" >/dev/null 2>&1; then
     jq -r '.impacted.tests.files[].file' "$FG_OUT/report.json"
     echo "FG_EOF"
   } >> "$GITHUB_OUTPUT"
+  filter="$("$(dirname "$0")/test-filter.sh" "$FG_OUT/report.json")"
+  {
+    echo "test-filter=$(jq -r .flat <<< "$filter")"
+    echo "test-filter-json=$(jq -c .packages <<< "$filter")"
+  } >> "$GITHUB_OUTPUT"
 fi
