@@ -106,7 +106,7 @@ check "run.sh impacted outputs" 0 runsh env FAKE_IMPACT=1
 has "$tmp/gho" "impacted-count=4" "impacted-count output"
 has "$tmp/gho" "impacted-tests-count=3" "impacted-tests-count output"
 has "$tmp/gho" "tests/b.rs" "impacted-test-files output"
-has "$tmp/gho" "test-filter=--test a --test b" "test-filter output"
+has "$tmp/gho" "test-filter=--workspace --test a --test b" "test-filter output"
 has "$tmp/gho" 'test-filter-json=[{"package":"p","args":["--test","a","--test","b"]}]' "test-filter-json output"
 check "run.sh old report" 0 runsh env
 grep -q impacted "$tmp/gho" && { echo "FAIL impacted outputs set for an old report"; fails=$((fails+1)); }
@@ -141,16 +141,32 @@ printf '[package]\nname = "d"\n' > "$tf/d/Cargo.toml"; touch "$tf/d/tests/helper
 tfilter() { (cd "$tf" && echo "$1" > r.json && "$root/scripts/test-filter.sh" r.json); }
 rep() { printf '{"impacted":{"tests":{"files":[%s]}}}' "$(printf '{"file":"%s"},' "$@" | sed 's/,$//')"; }
 check "test-filter maps files" 0 tfilter "$(rep a/tests/x.rs a/src/lib.rs b/tests/dir/helper.rs b/src/main.rs c/src/lib.rs a/examples/e.rs)"
-has "$tmp/out" '"flat": "--test dir --test x"' "flat has integration targets only"
+has "$tmp/out" '"flat": "--workspace --test dir --test x"' "flat has --workspace and integration targets only"
 has "$tmp/out" '"--bins"' "binary package gets --bins"
 check "test-filter: unit tests only" 0 tfilter "$(rep c/src/lib.rs)"
 has "$tmp/out" '"flat": ""' "no integration test -> empty flat"
 has "$tmp/out" '"package": "c"' "unit test package listed"
 check "test-filter: unknown helper module -> --tests" 0 tfilter "$(rep d/tests/sub/m.rs a/tests/x.rs)"
-has "$tmp/out" '"flat": "--tests"' "helper module selects all integration tests"
+has "$tmp/out" '"flat": "--workspace --tests"' "helper module selects all test targets"
 check "test-filter: empty report" 0 tfilter '{"impacted":{"tests":{"files":[]}}}'
 has "$tmp/out" '"packages": []' "empty packages"
 check "test-filter: file outside any package is skipped" 0 tfilter "$(rep nowhere/tests/q.rs)"
 has "$tmp/out" '"packages": []' "no package -> skipped"
+
+# hostile and odd layouts
+mkdir -p "$tf/e/src" "$tf/e/tests/deep/inner" "$tf/f/tests"
+printf '[package] # comment\nname = "e"\n' > "$tf/e/Cargo.toml"; touch "$tf/e/src/lib.rs" "$tf/e/src/main.rs" "$tf/e/src/cli.rs" "$tf/e/tests/deep/inner/main.rs"
+printf '[package]\nname = "f"\n' > "$tf/f/Cargo.toml"
+check "test-filter: lib and bin package, nested main.rs, commented [package]" 0 tfilter "$(rep e/src/cli.rs e/tests/deep/inner/main.rs)"
+has "$tmp/out" '"--lib"' "module of a lib+bin package selects --lib"
+has "$tmp/out" '"--bins"' "module of a lib+bin package selects --bins"
+has "$tmp/out" '"flat": "--workspace --tests"' "nested main.rs under a directory without main.rs -> --tests"
+# shellcheck disable=SC2016 # the literal is the point
+hostile='f/tests/$(touch pwned).rs'
+check "test-filter: shell metacharacters are skipped" 0 tfilter "$(rep "$hostile" 'f/tests/a b.rs' 'f/tests/ok.rs')"
+has "$tmp/out" '"flat": "--workspace --test ok"' "only the plain name survives"
+grep -qF 'pwned' "$tmp/out" && { echo "FAIL hostile name reached the output"; fails=$((fails+1)); }
+check "test-filter: newline in a name is skipped" 0 tfilter '{"impacted":{"tests":{"files":[{"file":"f/tests/a\nf/tests/b.rs"}]}}}'
+has "$tmp/out" '"flat": ""' "a name with a newline is dropped whole"
 
 exit "$fails"

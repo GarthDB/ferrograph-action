@@ -87,7 +87,7 @@ outputs:
     description: Files containing impacted tests, one per line, busiest first.
     value: ${{ steps.run.outputs.impacted-test-files }}
   test-filter:
-    description: '`cargo test` arguments selecting the impacted integration tests, e.g. `--test a --test b` (`--tests` when a helper module under `tests/` is impacted). Run from the workspace root. Unit tests under `src/` are not in it; use `test-filter-json`. Empty when no integration test is impacted. Unset with a ferrograph release older than 6.0.0.'
+    description: '`cargo test` arguments selecting the impacted integration tests, e.g. `--workspace --test a --test b` (`--workspace` finds a target in any member, also when the root is a package or `default-members` is set; `--workspace --tests`, every test target unit tests included, when a helper module under `tests/` is impacted). Unit tests under `src/` are not in it; use `test-filter-json`. Empty when no integration test is impacted. Unset with a ferrograph release older than 6.0.0.'
     value: ${{ steps.run.outputs.test-filter }}
   test-filter-json:
     description: 'JSON array `[{"package": "p", "args": ["--lib", "--test", "x"]}]`: per package, `--lib` or `--bins` for impacted unit tests under `src/` plus its impacted integration tests. Use with `cargo test -p <package> <args>`. Unset with a ferrograph release older than 6.0.0.'
