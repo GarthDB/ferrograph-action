@@ -39,7 +39,7 @@ jobs:
 | `entry` | | Extra entry points (glob or attribute), one per line. |
 | `ignore` | | File globs never reported, one per line. |
 | `strict` | `false` | Ambiguous call edges do not keep functions alive. |
-| `exclude-low-confidence` | `false` | Leave low-confidence call edges out of the blast radius. |
+| `exclude-low-confidence` | `false` | Leave low-confidence call edges out of the impacted set and the blast radius. |
 | `blast-limit` | | Cap on blast radius nodes listed. |
 | `markdown-limit` | | Cap on rows per Markdown table. |
 | `restricted-vis-not-root` | `default` | `default`, `true` or `false`: whether `pub(crate)` functions are dead-code candidates. `false` restores the 4.x behaviour. |

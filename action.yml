@@ -37,7 +37,7 @@ inputs:
     description: Do not let ambiguous call edges keep a function alive.
     default: 'false'
   exclude-low-confidence:
-    description: Leave low-confidence call edges out of the blast radius.
+    description: Leave low-confidence call edges out of the impacted set and the blast radius.
     default: 'false'
   blast-limit:
     description: Cap on blast radius nodes listed (`--blast-limit`).
