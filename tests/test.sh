@@ -91,6 +91,7 @@ chmod +x "$tmp/bin/ferrograph"
 repo="$tmp/repo"; mkdir "$repo"
 git -C "$repo" init -q -b main && git -C "$repo" -c user.email=a@b -c user.name=t commit -q --allow-empty -m base
 git -C "$repo" checkout -q -b feature && git -C "$repo" -c user.email=a@b -c user.name=t commit -q --allow-empty -m change
+mkdir -p "$repo/tests"; printf '[package]\nname = "p"\n' > "$repo/Cargo.toml"; touch "$repo/tests/a.rs" "$repo/tests/b.rs"
 # shellcheck disable=SC2329 # invoked through check
 runsh() { (cd "$repo" && : > "$tmp/fglog" && : > "$tmp/gho" && PATH="$tmp/bin:$PATH" FAKE_FG_LOG="$tmp/fglog" GITHUB_OUTPUT="$tmp/gho" FG_OUT="$tmp/fgout" IN_BASE=main "$@" "$root/scripts/run.sh"); }
 check "run.sh succeeds" 0 runsh env
@@ -105,8 +106,11 @@ check "run.sh impacted outputs" 0 runsh env FAKE_IMPACT=1
 has "$tmp/gho" "impacted-count=4" "impacted-count output"
 has "$tmp/gho" "impacted-tests-count=3" "impacted-tests-count output"
 has "$tmp/gho" "tests/b.rs" "impacted-test-files output"
+has "$tmp/gho" "test-filter=--test a --test b" "test-filter output"
+has "$tmp/gho" 'test-filter-json=[{"package":"p","args":["--test","a","--test","b"]}]' "test-filter-json output"
 check "run.sh old report" 0 runsh env
 grep -q impacted "$tmp/gho" && { echo "FAIL impacted outputs set for an old report"; fails=$((fails+1)); }
+grep -q test-filter "$tmp/gho" && { echo "FAIL test-filter set for an old report"; fails=$((fails+1)); }
 check "run.sh passes impact-depth" 0 runsh env IN_IMPACT_DEPTH=2
 has "$tmp/fglog" "--impact-depth 2" "impact-depth forwarded"
 check "run.sh passes max-impacted" 0 runsh env IN_MAX_IMPACTED=5
@@ -126,5 +130,27 @@ has "$tmp/fglog" "--max-impacted 10 --out" "extra-args appended before --out"
 check "tri-state default adds nothing" 0 runsh env IN_RESTRICTED_VIS_NOT_ROOT=default
 grep -q "vis-not-root" "$tmp/fglog" && { echo "FAIL default tri-state emitted a flag"; fails=$((fails+1)); }
 check "bad tri-state rejected" 2 runsh env IN_BIN_PUB_NOT_ROOT=maybe
+
+# test-filter.sh: integration targets, unit tests per package, helper modules, skipped files
+tf="$tmp/ws"; mkdir -p "$tf/a/src" "$tf/a/tests" "$tf/b/src" "$tf/b/tests/dir" "$tf/c/src" "$tf/d/tests"
+printf '[package]\nname = "a"\n' > "$tf/a/Cargo.toml"; touch "$tf/a/src/lib.rs" "$tf/a/tests/x.rs"
+printf '[package]\nname = "b"\n' > "$tf/b/Cargo.toml"; touch "$tf/b/src/main.rs" "$tf/b/tests/dir/main.rs" "$tf/b/tests/dir/helper.rs"
+printf '[package]\nname = "c"\n' > "$tf/c/Cargo.toml"; touch "$tf/c/src/lib.rs"
+printf '[package]\nname = "d"\n' > "$tf/d/Cargo.toml"; touch "$tf/d/tests/helper.rs"; mkdir "$tf/d/tests/sub"; touch "$tf/d/tests/sub/m.rs"
+# shellcheck disable=SC2329 # invoked through check
+tfilter() { (cd "$tf" && echo "$1" > r.json && "$root/scripts/test-filter.sh" r.json); }
+rep() { printf '{"impacted":{"tests":{"files":[%s]}}}' "$(printf '{"file":"%s"},' "$@" | sed 's/,$//')"; }
+check "test-filter maps files" 0 tfilter "$(rep a/tests/x.rs a/src/lib.rs b/tests/dir/helper.rs b/src/main.rs c/src/lib.rs a/examples/e.rs)"
+has "$tmp/out" '"flat": "--test dir --test x"' "flat has integration targets only"
+has "$tmp/out" '"--bins"' "binary package gets --bins"
+check "test-filter: unit tests only" 0 tfilter "$(rep c/src/lib.rs)"
+has "$tmp/out" '"flat": ""' "no integration test -> empty flat"
+has "$tmp/out" '"package": "c"' "unit test package listed"
+check "test-filter: unknown helper module -> --tests" 0 tfilter "$(rep d/tests/sub/m.rs a/tests/x.rs)"
+has "$tmp/out" '"flat": "--tests"' "helper module selects all integration tests"
+check "test-filter: empty report" 0 tfilter '{"impacted":{"tests":{"files":[]}}}'
+has "$tmp/out" '"packages": []' "empty packages"
+check "test-filter: file outside any package is skipped" 0 tfilter "$(rep nowhere/tests/q.rs)"
+has "$tmp/out" '"packages": []' "no package -> skipped"
 
 exit "$fails"

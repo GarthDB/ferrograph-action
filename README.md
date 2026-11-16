@@ -37,7 +37,7 @@ jobs:
 | `max-impacted` | | Fail if more than N functions are impacted (callers of the changed functions; name-based, may over-count). Needs a ferrograph release with `--max-impacted`. |
 | `impact-depth` | | Caller hops for the impacted set (1-100); empty uses ferrograph's default. Needs a ferrograph release newer than 5.0.0. |
 | `entry` | | Extra entry points (glob or attribute), one per line. |
-| `ignore` | | File globs never reported, one per line. |
+| `ignore` | | File globs never reported, one per line. Use it for generated code (see below). |
 | `strict` | `false` | Ambiguous call edges do not keep functions alive. |
 | `exclude-low-confidence` | `false` | Leave low-confidence call edges out of the impacted set and the blast radius. |
 | `blast-limit` | | Cap on blast radius nodes listed. |
@@ -54,6 +54,42 @@ jobs:
 ## Outputs
 
 `new-dead-count`, `blast-count`, `exit-code` (0/1/2), `report-path` (Markdown report). With a ferrograph release that has `pr` impact reporting (6.0.0), also `impacted-count`, `impacted-tests-count` and `impacted-test-files` (newline-separated, busiest first); they are unset on older releases. The comment's "Impacted by this change" section comes from ferrograph's Markdown report.
+
+`test-filter` and `test-filter-json` (same ferrograph release) turn the impacted test files into `cargo test` selectors:
+
+- `test-filter` is a flat string such as `--test a --test b` for the impacted integration tests (`tests/<name>.rs` and `tests/<name>/main.rs`). Cargo selects each target in whichever workspace member owns it, so run it from the workspace root. It is `--tests` (all integration tests) when a helper module under `tests/` is impacted, and empty when no integration test is.
+- `test-filter-json` is a JSON array with one entry per package, `[{"package": "p", "args": ["--lib", "--test", "x"]}]`. Unit tests under `src/` can only be selected per package (`--lib`, or `--bins` for a package without a library), never per file, so they appear only here. Run them with `cargo test -p <package> <args>`.
+- Examples and benches are not tests and are left out. The impacted set is name-based and can over-count, and it is a lower bound when ferrograph reports it as truncated, so treat the filter as a way to run the likely tests first, not as proof that the rest are unaffected.
+
+```yaml
+- uses: GarthDB/ferrograph-action@v2
+  id: fg
+- name: Run affected integration tests
+  if: steps.fg.outputs.test-filter != ''
+  run: cargo test ${{ steps.fg.outputs.test-filter }}
+- name: Run affected unit tests
+  env:
+    FILTER: ${{ steps.fg.outputs.test-filter-json }}
+  run: |
+    jq -r '.[] | .package as $p | .args[] | select(. == "--lib" or . == "--bins") | "\($p) \(.)"' <<< "$FILTER" |
+      while read -r pkg kind; do cargo test -p "$pkg" "$kind"; done
+```
+
+Keep a full `cargo test` in CI as well.
+
+## Generated code
+
+Generated files (design-token tables, bindgen output) are often reported dead or flood the impacted list. Exclude them with `ignore`; the globs also filter the changed and impacted lists, so edits to a generated file do not appear:
+
+```yaml
+- uses: GarthDB/ferrograph-action@v2
+  with:
+    ignore: |
+      **/generated/**
+      src/tokens/*.rs
+```
+
+A repository `.ferrograph.toml` with `[dead] ignore = [...]` has the same effect.
 
 ## Behaviour
 
